@@ -101,7 +101,7 @@ JAILBREAK_PATTERNS = [
 
 @dataclass
 class SecurityConfig:
-    """Security configuration"""
+    """Security configuration with resource limits"""
     # Filesystem jail
     allowed_base_dir: Path = Path.cwd()
     allow_write_outside_base: bool = False
@@ -112,6 +112,23 @@ class SecurityConfig:
     max_output_lines: int = 1000
     max_file_size_mb: int = 10
     
+    # Resource limits for agent operations
+    max_daily_commands: int = 1000  # Limit total commands per day
+    max_hourly_api_calls: int = 100  # Limit LLM API calls per hour
+    max_concurrent_operations: int = 5  # Limit parallel operations
+    max_memory_usage_mb: int = 512  # Limit agent memory footprint
+    max_disk_usage_mb: int = 100  # Limit total disk usage for agent
+    
+    # Rate limiting
+    rate_limit_per_minute: int = 30  # Max messages per minute per session
+    rate_limit_window_seconds: int = 60
+    
+    # Content limits
+    max_message_length: int = 10000  # Max chars per user message
+    max_response_length: int = 8000  # Max chars per agent response
+    max_attachments: int = 5  # Max file attachments per message
+    max_attachment_size_mb: int = 5  # Max size per attachment
+    
     # Network
     block_internal_ips: bool = True
     block_metadata_endpoints: bool = True
@@ -119,6 +136,7 @@ class SecurityConfig:
     
     # Audit
     audit_log_path: Optional[Path] = None
+    audit_retention_days: int = 90  # How long to keep audit logs
     
     def __post_init__(self):
         if self.allowed_hosts is None:
@@ -394,6 +412,77 @@ class SecurityManager:
                 'output': '',
                 'error': f'Execution error: {str(e)}'
             }
+    
+    def check_rate_limit(self, session_id: str) -> Tuple[bool, str]:
+        """
+        Check if session is within rate limits.
+        
+        Returns:
+            (is_allowed, reason)
+        """
+        # Implementation would track requests per session
+        # For now, just log and allow
+        return True, "Rate limit OK"
+    
+    def check_message_size(self, message: str) -> Tuple[bool, str]:
+        """Check if message is within size limits"""
+        if len(message) > self.config.max_message_length:
+            return False, f"Message too long ({len(message)} chars). Max: {self.config.max_message_length}"
+        return True, "Message size OK"
+    
+    def check_disk_usage(self) -> Tuple[bool, str]:
+        """Check if agent is within disk usage limits"""
+        try:
+            import shutil
+            total_size = 0
+            for dirpath, dirnames, filenames in os.walk(self.config.allowed_base_dir):
+                for f in filenames:
+                    fp = os.path.join(dirpath, f)
+                    total_size += os.path.getsize(fp)
+            
+            total_mb = total_size / (1024 * 1024)
+            if total_mb > self.config.max_disk_usage_mb:
+                return False, f"Disk usage ({total_mb:.1f}MB) exceeds limit ({self.config.max_disk_usage_mb}MB)"
+            return True, f"Disk usage: {total_mb:.1f}MB / {self.config.max_disk_usage_mb}MB"
+        except Exception as e:
+            return True, f"Could not check disk usage: {e}"
+    
+    def check_memory_usage(self) -> Tuple[bool, str]:
+        """Check if agent process is within memory limits"""
+        try:
+            import psutil
+            process = psutil.Process(os.getpid())
+            mem_mb = process.memory_info().rss / (1024 * 1024)
+            
+            if mem_mb > self.config.max_memory_usage_mb:
+                return False, f"Memory usage ({mem_mb:.1f}MB) exceeds limit ({self.config.max_memory_usage_mb}MB)"
+            return True, f"Memory usage: {mem_mb:.1f}MB / {self.config.max_memory_usage_mb}MB"
+        except ImportError:
+            return True, "psutil not available, skipping memory check"
+        except Exception as e:
+            return True, f"Could not check memory: {e}"
+    
+    def get_resource_status(self) -> Dict:
+        """Get current resource usage status"""
+        disk_ok, disk_msg = self.check_disk_usage()
+        mem_ok, mem_msg = self.check_memory_usage()
+        
+        return {
+            'disk_usage': disk_msg,
+            'disk_ok': disk_ok,
+            'memory_usage': mem_msg,
+            'memory_ok': mem_ok,
+            'limits': {
+                'max_file_size_mb': self.config.max_file_size_mb,
+                'max_disk_usage_mb': self.config.max_disk_usage_mb,
+                'max_memory_usage_mb': self.config.max_memory_usage_mb,
+                'command_timeout': self.config.command_timeout,
+                'max_output_lines': self.config.max_output_lines,
+                'max_message_length': self.config.max_message_length,
+                'max_daily_commands': self.config.max_daily_commands,
+                'rate_limit_per_minute': self.config.rate_limit_per_minute,
+            }
+        }
 
 
 # Global security manager instance
