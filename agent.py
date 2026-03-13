@@ -239,10 +239,19 @@ Always be helpful, accurate, and responsive.
         import re
         msg_lower = message.lower().strip()
         
-        # File read: "read file X" or "show file X" or "cat X"
+        # Skip if message contains code blocks (likely code review/debug)
+        if '```' in message or '`' in message:
+            return None
+        
+        # Skip if looks like code (contains common code patterns)
+        code_indicators = ['def ', 'class ', 'import ', 'print(', 'input(', '= ', 'return ', 'if ', 'for ', 'while ']
+        if any(indicator in message for indicator in code_indicators):
+            return None
+        
+        # File read: MUST start with read/show/cat/display
         read_patterns = [
-            r'(?:read|show|cat|display)\s+(?:file\s+)?["\']?(.+?)["\']?(?:\s|$)',
-            r'(?:open|view)\s+(?:file\s+)?["\']?(.+?)["\']?(?:\s|$)',
+            r'^(?:read|show|cat|display)\s+(?:file\s+)?["\']?((?:~\/|\/|\.)[^"\']+)["\']?$',
+            r'^(?:open|view)\s+(?:file\s+)?["\']?((?:~\/|\/|\.)[^"\']+)["\']?$',
         ]
         for pattern in read_patterns:
             match = re.search(pattern, msg_lower)
@@ -250,22 +259,22 @@ Always be helpful, accurate, and responsive.
                 file_path = match.group(1).strip()
                 return self.file_tools.read_file(file_path)
         
-        # Directory list: "list files" or "ls" or "show directory"
-        if any(cmd in msg_lower for cmd in ['list files', 'list directory', 'ls', 'show files']):
-            # Extract directory path if specified
-            dir_match = re.search(r'(?:in|from|of)\s+["\']?(.+?)["\']?(?:\s|$)', msg_lower)
+        # Directory list: explicit commands only
+        if msg_lower.startswith(('list files', 'ls', 'show files', 'list directory')):
+            # Extract directory path if specified (must look like a path)
+            dir_match = re.search(r'(?:in|from)\s+((?:~\/|\/|\.)[^\s]+)', msg_lower)
             dir_path = dir_match.group(1) if dir_match else "."
             return self.file_tools.list_directory(dir_path)
         
-        # File write: "write X to file Y" or "create file Y with X"
-        write_match = re.search(r'(?:write|save)\s+["\']?(.+?)["\']?\s+to\s+(?:file\s+)?["\']?(.+?)["\']?$', msg_lower)
+        # File write: "write X to file Y" - Y must look like a path
+        write_match = re.search(r'^(?:write|save)\s+["\']?(.+?)["\']?\s+to\s+(?:file\s+)?["\']?((?:~\/|\/|\.)[^"\']+)["\']?$', msg_lower)
         if write_match:
             content = write_match.group(1)
             file_path = write_match.group(2)
             return self.file_tools.write_file(file_path, content)
         
-        # File edit: "change X to Y in file Z" or "replace X with Y in file Z"
-        edit_match = re.search(r'(?:change|replace|edit)\s+["\']?(.+?)["\']?\s+to\s+["\']?(.+?)["\']?\s+in\s+(?:file\s+)?["\']?(.+?)["\']?$', msg_lower)
+        # File edit: "change X to Y in file Z" - Z must look like a path
+        edit_match = re.search(r'^(?:change|replace|edit)\s+["\']?(.+?)["\']?\s+to\s+["\']?(.+?)["\']?\s+in\s+(?:file\s+)?["\']?((?:~\/|\/|\.)[^"\']+)["\']?$', msg_lower)
         if edit_match:
             old_text = edit_match.group(1)
             new_text = edit_match.group(2)
@@ -340,26 +349,9 @@ Always be helpful, accurate, and responsive.
                 'blocked': True
             }
         
-        # Check for file commands (if file tools enabled)
-        file_result = self._execute_file_command(message)
-        if file_result:
-            # Format file result as response
-            if file_result.get('success'):
-                if 'content' in file_result:
-                    response = f"📄 **{file_result.get('file_name', 'File')}** ({file_result.get('total_lines', 0)} lines):\n```\n{file_result['content']}\n```"
-                elif 'items' in file_result:
-                    items = '\n'.join(file_result['items'])
-                    response = f"📁 **Directory: {file_result.get('directory', '.')}**\n\n{items}"
-                else:
-                    response = f"✅ {file_result.get('message', 'Success')}"
-            else:
-                response = f"❌ Error: {file_result.get('error', 'Unknown error')}"
-            
-            return {
-                'response': response,
-                'session_id': session_id,
-                'tool_result': file_result
-            }
+        # IMPORTANT: Check code commands BEFORE file commands
+        # so code review/debug takes priority over file operations
+        # (prevents "in" inside code from triggering file commands)
         
         # Check for code commands (if code tools enabled)
         if self.code_tools:
@@ -386,9 +378,10 @@ Always be helpful, accurate, and responsive.
                     'tool_result': code_result
                 }
         
-        # Get conversation history
-        history = []
-        if self.memory:
+        # Check for file commands (if file tools enabled)
+        # Note: Must come AFTER code tools to avoid matching "in" inside code
+        file_result = self._execute_file_command(message)
+        if file_result:
             history = self.memory.get_conversation_history(session_id, limit=20)
         
         # Build messages
