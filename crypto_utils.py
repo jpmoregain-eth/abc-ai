@@ -65,7 +65,7 @@ def get_cipher() -> Fernet:
 def encrypt_value(value: str) -> str:
     """
     Encrypt a string value
-    Returns base64-encoded encrypted string with prefix
+    Returns Fernet token with ENC: prefix
     """
     if not value:
         return value
@@ -76,8 +76,9 @@ def encrypt_value(value: str) -> str:
     
     try:
         cipher = get_cipher()
+        # Fernet.encrypt() already returns base64-encoded bytes
         encrypted = cipher.encrypt(value.encode())
-        return f"ENC:{base64.urlsafe_b64encode(encrypted).decode()}"
+        return f"ENC:{encrypted.decode()}"
     except Exception as e:
         logger.error(f"Encryption failed: {e}")
         return value
@@ -97,7 +98,7 @@ def decrypt_value(value: str) -> str:
     
     try:
         cipher = get_cipher()
-        encrypted_data = base64.urlsafe_b64decode(value[4:])  # Remove ENC: prefix
+        encrypted_data = value[4:].encode()  # Remove ENC: prefix, encode to bytes
         decrypted = cipher.decrypt(encrypted_data)
         return decrypted.decode()
     except Exception as e:
