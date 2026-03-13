@@ -145,6 +145,8 @@ Your agent needs API keys to talk to AI services. Here's how to get them:
 - **Alibaba (Qwen)**: https://dashscope.aliyun.com
 
 > ⚠️ **Important:** Keep your API keys secret! Don't share them or commit them to git.
+> 
+> 🔒 **Security:** API keys are automatically encrypted at rest using Fernet encryption. Your master key is stored at `~/.agentbear/.master_key` with restricted permissions (owner read-only).
 
 ---
 
