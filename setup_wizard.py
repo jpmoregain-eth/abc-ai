@@ -290,6 +290,7 @@ if __name__ == '__main__':
     import time
     import threading
     import webbrowser
+    import os
     
     def open_browser():
         """Open browser after short delay"""
@@ -301,9 +302,10 @@ if __name__ == '__main__':
     print("Open http://localhost:5000 in your browser")
     print("=" * 40)
     
-    # Start browser in background thread
-    browser_thread = threading.Thread(target=open_browser, daemon=True)
-    browser_thread.start()
+    # Only open browser if not in Flask reloader (prevents double tabs)
+    if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+        browser_thread = threading.Thread(target=open_browser, daemon=True)
+        browser_thread.start()
     
     app.run(host='0.0.0.0', port=5000, debug=True)
 
