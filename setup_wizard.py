@@ -168,14 +168,22 @@ def launch_agent():
         # Build config from session data (includes encrypted API key!)
         progress = load_progress()
         
+        # DEBUG: Log what we have in session
+        logger.info(f"DEBUG - Session progress: {progress}")
+        
         # Combine all step data
         wizard_data = {}
         for step_data in progress.values():
             wizard_data.update(step_data)
         
+        logger.info(f"DEBUG - Wizard data keys: {wizard_data.keys()}")
+        logger.info(f"DEBUG - api_key_anthropic present: {'api_key_anthropic' in wizard_data}")
+        
         # Build full config with API key
         config = build_config(wizard_data)
         config_yaml = yaml.dump(config, default_flow_style=False)
+        
+        logger.info(f"DEBUG - Config api_key is empty: {config['model']['api_key'] == ''}")
         
         # Save config to file
         config_path = Path.home() / '.agentbear' / 'agents' / f'{agent_name}.yaml'
