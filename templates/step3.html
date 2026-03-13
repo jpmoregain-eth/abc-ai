@@ -101,14 +101,23 @@
             const fieldHtml = `
                 <div class="form-group" style="background: var(--bg-dark); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
                     <label for="api_key_${providerKey}">${provider.name} API Key *</label>
-                    <input 
-                        type="password" 
-                        id="api_key_${providerKey}" 
-                        name="api_key_${providerKey}" 
-                        placeholder="Enter ${provider.name} API key"
-                        value="${existingValue}"
-                        required
-                    >
+                    <div style="position: relative; display: flex; align-items: center;">
+                        <input 
+                            type="password" 
+                            id="api_key_${providerKey}" 
+                            name="api_key_${providerKey}" 
+                            placeholder="Enter ${provider.name} API key"
+                            value="${existingValue}"
+                            required
+                            style="flex: 1; padding-right: 2.5rem;"
+                        >
+                        <button type="button" 
+                                onclick="toggleApiKeyVisibility('api_key_${providerKey}', this)"
+                                style="position: absolute; right: 0.5rem; background: none; border: none; cursor: pointer; padding: 0.25rem; font-size: 1.1rem; color: var(--text-secondary);"
+                                title="Show/Hide API key">
+                            👁️
+                        </button>
+                    </div>
                     <p class="help-text">
                         Get your key from <a href="${provider.docs_url}" target="_blank" style="color: var(--primary);">${provider.docs_url}</a>
                     </p>
@@ -164,6 +173,20 @@
     document.addEventListener('DOMContentLoaded', function() {
         updateProviders();
     });
+    
+    // Toggle API key visibility
+    function toggleApiKeyVisibility(inputId, btn) {
+        const input = document.getElementById(inputId);
+        if (input.type === 'password') {
+            input.type = 'text';
+            btn.textContent = '🙈';
+            btn.title = 'Hide API key';
+        } else {
+            input.type = 'password';
+            btn.textContent = '👁️';
+            btn.title = 'Show API key';
+        }
+    }
 </script>
 
 {% endblock %}
