@@ -20,7 +20,7 @@ Agent Bear Corps lets you create your own AI agent that:
 ### Step 1: Download
 
 ```bash
-git clone https://github.com/jpmoregain-eth/Agent Bear Corps.git
+git clone https://github.com/jpmoregain-eth/agentbearcorps.git
 cd Agent Bear Corps
 ```
 
