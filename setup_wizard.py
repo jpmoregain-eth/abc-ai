@@ -312,7 +312,7 @@ def build_config(data: dict) -> dict:
         # Add API keys for capabilities that need them
         for category in CAPABILITIES.values():
             for item in category['items']:
-                if item['id'] == cap_id and item.get('api_key'):
+                if item['id'] == cap_id and item.get('requires_api_key'):
                     key_name = item.get('key_name')
                     logger.info(f"BUILD_CONFIG DEBUG - Capability {cap_id} needs key: {key_name}")
                     if key_name and key_name in data:
