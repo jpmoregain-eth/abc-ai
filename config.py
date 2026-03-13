@@ -13,6 +13,10 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from datetime import datetime
 
+# Import crypto utils for decryption
+sys.path.insert(0, str(Path(__file__).parent))
+from crypto_utils import decrypt_value
+
 # Setup logging
 logging.basicConfig(
     level=logging.INFO,
@@ -63,6 +67,13 @@ class AgentConfig:
         models = data.get('models', {})
         config.primary_model = models.get('primary', 'claude-sonnet-4-6')
         config.providers = models.get('providers', {})
+        
+        # Decrypt API keys in providers
+        for provider_name, provider_config in config.providers.items():
+            if 'api_key' in provider_config:
+                provider_config['api_key'] = decrypt_value(provider_config['api_key'])
+            if 'api_secret' in provider_config:
+                provider_config['api_secret'] = decrypt_value(provider_config['api_secret'])
         
         # Capabilities
         config.capabilities = data.get('capabilities', {})
