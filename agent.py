@@ -96,7 +96,12 @@ class ABCAIAgent:
             import threading
             def run_bot():
                 asyncio.set_event_loop(asyncio.new_event_loop())
-                self.telegram_app.run_polling(allowed_updates=Update.ALL_TYPES)
+                # Disable signal handlers for thread mode
+                self.telegram_app.run_polling(
+                    allowed_updates=Update.ALL_TYPES,
+                    stop_signals=None,
+                    close_loop=False
+                )
             
             bot_thread = threading.Thread(target=run_bot, daemon=True)
             bot_thread.start()
