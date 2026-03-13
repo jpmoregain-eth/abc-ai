@@ -8,6 +8,7 @@ import sys
 import yaml
 import json
 import logging
+import asyncio
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 from datetime import datetime
@@ -16,6 +17,16 @@ from config import AgentConfig
 from memory import AgentMemory
 from providers import ProviderFactory
 from security import SecurityManager, SecurityConfig, get_security_manager
+
+# Telegram bot integration
+try:
+    from telegram import Update
+    from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+    TELEGRAM_AVAILABLE = True
+except ImportError:
+    TELEGRAM_AVAILABLE = False
+    logger = logging.getLogger(__name__)
+    logger.warning("python-telegram-bot not installed. Telegram bot capability disabled.")
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +68,83 @@ class ABCAIAgent:
         self.security = SecurityManager(security_config)
         
         self._setup_providers()
+        
+        # Start Telegram bot if capability enabled
+        self.telegram_app = None
+        if TELEGRAM_AVAILABLE and 'telegram_bot' in self.config.capabilities:
+            self._setup_telegram_bot()
+    
+    def _setup_telegram_bot(self):
+        """Initialize and start Telegram bot"""
+        try:
+            bot_config = self.config.capabilities.get('telegram_bot', {})
+            token = bot_config.get('api_key', '')
+            
+            if not token:
+                logger.warning("Telegram bot token not found in config")
+                return
+            
+            # Build application
+            self.telegram_app = Application.builder().token(token).build()
+            
+            # Add handlers
+            self.telegram_app.add_handler(CommandHandler("start", self._telegram_start))
+            self.telegram_app.add_handler(CommandHandler("help", self._telegram_help))
+            self.telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._telegram_message))
+            
+            # Start bot in background
+            import threading
+            def run_bot():
+                asyncio.set_event_loop(asyncio.new_event_loop())
+                self.telegram_app.run_polling(allowed_updates=Update.ALL_TYPES)
+            
+            bot_thread = threading.Thread(target=run_bot, daemon=True)
+            bot_thread.start()
+            
+            logger.info("🤖 Telegram bot started!")
+            
+        except Exception as e:
+            logger.error(f"Failed to start Telegram bot: {e}")
+    
+    async def _telegram_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /start command"""
+        welcome_msg = f"""🐻 Hello! I'm {self.config.name}, your AI agent.
+
+I can help you with:
+• Code generation and review
+• Documentation
+• Git operations
+• General questions
+
+Send me a message anytime!"""
+        await update.message.reply_text(welcome_msg)
+    
+    async def _telegram_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /help command"""
+        help_msg = f"""Available commands:
+/start - Start the bot
+/help - Show this help
+
+Just send me any message and I'll respond!"""
+        await update.message.reply_text(help_msg)
+    
+    async def _telegram_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle incoming messages"""
+        user_message = update.message.text
+        chat_id = update.effective_chat.id
+        
+        # Show typing indicator
+        await context.bot.send_chat_action(chat_id=chat_id, action="typing")
+        
+        # Process through agent
+        session_id = f"telegram_{chat_id}"
+        result = self.chat(user_message, session_id=session_id)
+        
+        # Send response
+        if 'error' in result:
+            await update.message.reply_text(f"❌ Error: {result['error']}")
+        else:
+            await update.message.reply_text(result['response'])
     
     def _setup_providers(self):
         """Initialize LLM providers"""
