@@ -63,30 +63,31 @@
         
     </div>
     
-    <!-- DEMO MODE: Disabled Launch Button -->
+    <!-- LAUNCH BUTTON: Enabled and functional -->
     <div style="text-align: center; margin-bottom: 2rem;">
         <button 
-            disabled
+            id="launch-btn"
+            onclick="launchAgent()"
             style="
-                background: var(--bg-elevated);
-                color: var(--text-muted);
-                border: 1px solid var(--border);
+                background: linear-gradient(135deg, var(--primary), var(--secondary));
+                color: white;
+                border: none;
                 padding: 1rem 2rem;
                 border-radius: 0.5rem;
                 font-size: 1.1rem;
                 font-weight: 600;
-                cursor: not-allowed;
-                opacity: 0.6;
+                cursor: pointer;
+                transition: all 0.2s;
             "
+            onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 10px 20px rgba(99,102,241,0.3)';"
+            onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='none';"
         >
             🚀 Launch Agent
         </button>
         
-        <div style="margin-top: 1rem; padding: 1rem; background: rgba(245,158,11,0.1); border-radius: 0.5rem;">
-            <div style="color: var(--warning); font-weight: 600;">⚠ Demo Mode</div>
-            <div style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.5rem;">
-                Launch button is disabled for this demo.<br>
-                In production, this would start your agent.
+        <div id="launch-status" style="margin-top: 1rem; display: none;">
+            <div style="padding: 1rem; border-radius: 0.5rem;">
+                <span id="status-text"></span>
             </div>
         </div>
         
@@ -231,6 +232,91 @@ memory:
         a.click();
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
+    }
+
+    async function launchAgent() {
+        const btn = document.getElementById('launch-btn');
+        const statusDiv = document.getElementById('launch-status');
+        const statusText = document.getElementById('status-text');
+
+        btn.disabled = true;
+        btn.innerHTML = '🔄 Launching...';
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = 'rgba(99,102,241,0.1)';
+        statusText.innerHTML = 'Starting agent runtime...';
+
+        const agentName = '{{ progress.get('step_1', {}).get('agent_name', 'my-agent') }}';
+        const configYaml = buildConfigYaml();
+
+        try {
+            const response = await fetch('/api/launch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    agent_name: agentName,
+                    config_yaml: configYaml
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                statusDiv.style.background = 'rgba(16,185,129,0.1)';
+                statusText.innerHTML = `
+                    ✅ <strong>${result.message}</strong><br>
+                    <small>PID: ${result.pid} | Config: ${result.config_path}</small><br>
+                    <a href="/" class="btn btn-primary" style="margin-top: 1rem;">Create Another Agent</a>
+                `;
+                btn.innerHTML = '🎉 Launched!';
+                btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+            } else {
+                throw new Error(result.message);
+            }
+        } catch (error) {
+            statusDiv.style.background = 'rgba(239,68,68,0.1)';
+            statusText.innerHTML = `❌ <strong>Failed:</strong> ${error.message}`;
+            btn.disabled = false;
+            btn.innerHTML = '🚀 Retry Launch';
+        }
+    }
+
+    function buildConfigYaml() {
+        const agentName = '{{ progress.get('step_1', {}).get('agent_name', 'my-agent') }}';
+        const ownerName = '{{ progress.get('step_1', {}).get('owner_name', 'owner') }}';
+        const language = '{{ progress.get('step_1', {}).get('language', 'en') }}';
+        const provider = '{{ progress.get('step_3', {}).get('provider', 'anthropic') }}';
+        const modelName = '{{ progress.get('step_3', {}).get('model_name', 'claude-sonnet-4-6') }}';
+        const persona = '{{ progress.get('step_2', {}).get('persona', 'professional') }}';
+
+        const capabilities = [];
+        {% for cap in progress.get('step_4', {}).get('capabilities', []) %}
+        capabilities.push('{{ cap }}');
+        {% endfor %}
+
+        let capsYaml = '';
+        capabilities.forEach(cap => {
+            capsYaml += `  ${cap}:\n    enabled: true\n`;
+        });
+
+        return `agent:
+  name: "${agentName}"
+  owner: "${ownerName}"
+  language: "${language}"
+  persona: "${persona}"
+  version: "1.0.0"
+
+model:
+  provider: "${provider}"
+  name: "${modelName}"
+  max_tokens: 4000
+  temperature: 0.3
+
+capabilities:
+${capsYaml || '  # None selected\n'}
+memory:
+  enabled: true
+  db_path: "agent_memory.db"
+`;
     }
 </script>
 

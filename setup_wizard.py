@@ -157,13 +157,61 @@ def generate_config():
 
 @app.route('/api/launch', methods=['POST'])
 def launch_agent():
-    """Launch the generated agent - Demo mode for Vercel"""
-    # On Vercel serverless, we can't launch subprocesses
-    # Just return success for demo purposes
-    return jsonify({
-        'success': True,
-        'message': 'Agent configured successfully (Demo mode - no subprocess on serverless)'
-    })
+    """Launch the generated agent - Actually starts the runtime"""
+    import subprocess
+    import sys
+    
+    data = request.json
+    agent_name = data.get('agent_name', 'my-agent')
+    config_yaml = data.get('config_yaml', '')
+    
+    try:
+        # Save config to file
+        config_path = Path.home() / '.agentbear' / 'agents' / f'{agent_name}.yaml'
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        with open(config_path, 'w') as f:
+            f.write(config_yaml)
+        
+        # Start the agent in background
+        agent_script = Path(__file__).parent / 'agent.py'
+        process = subprocess.Popen(
+            [sys.executable, str(agent_script), str(config_path)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=str(Path(__file__).parent)
+        )
+        
+        # Register in registry
+        registry_path = Path.home() / '.agentbear' / 'registry.json'
+        registry = {}
+        if registry_path.exists():
+            with open(registry_path, 'r') as f:
+                registry = json.load(f)
+        
+        registry[agent_name] = {
+            'config_path': str(config_path),
+            'pid': process.pid,
+            'created_at': datetime.now().isoformat(),
+            'status': 'running'
+        }
+        
+        with open(registry_path, 'w') as f:
+            json.dump(registry, f, indent=2)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Agent "{agent_name}" launched successfully!',
+            'pid': process.pid,
+            'config_path': str(config_path)
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to launch agent: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Failed to launch agent: {str(e)}'
+        }), 500
 
 
 def save_progress(step: int, data: dict):
