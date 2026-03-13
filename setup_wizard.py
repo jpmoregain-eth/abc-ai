@@ -183,7 +183,14 @@ def launch_agent():
         config = build_config(wizard_data)
         config_yaml = yaml.dump(config, default_flow_style=False)
         
-        logger.info(f"DEBUG - Config api_key is empty: {config['model']['api_key'] == ''}")
+        # DEBUG: Check if models structure is correct
+        logger.info(f"DEBUG - Config has 'models': {'models' in config}")
+        if 'models' in config and 'providers' in config['models']:
+            provider_name = list(config['models']['providers'].keys())[0] if config['models']['providers'] else 'none'
+            logger.info(f"DEBUG - First provider: {provider_name}")
+            if provider_name != 'none':
+                api_key = config['models']['providers'][provider_name].get('api_key', '')
+                logger.info(f"DEBUG - Provider API key empty: {api_key == ''}")
         
         # Save config to file
         config_path = Path.home() / '.agentbear' / 'agents' / f'{agent_name}.yaml'
