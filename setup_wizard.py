@@ -289,7 +289,7 @@ def build_config(data: dict) -> dict:
         },
         'model': {
             'provider': provider,
-            'name': data.get('model_name', 'claude-sonnet-4-6'),
+            'name': data.get('primary_model', data.get('model_name', 'claude-sonnet-4-6')),
             'endpoint': AI_PROVIDERS.get(provider, {}).get('endpoint', ''),
             'api_key': encrypt_value(api_key),
             'max_tokens': 4000,
@@ -302,7 +302,10 @@ def build_config(data: dict) -> dict:
         }
     }
     
-    # Add capability configs
+    # Add capability configs with API keys
+    logger.info(f"BUILD_CONFIG DEBUG - selected_caps: {selected_caps}")
+    logger.info(f"BUILD_CONFIG DEBUG - Looking for capability API keys in: {list(data.keys())}")
+    
     for cap_id in selected_caps:
         config['capabilities'][cap_id] = {'enabled': True}
         
@@ -311,8 +314,12 @@ def build_config(data: dict) -> dict:
             for item in category['items']:
                 if item['id'] == cap_id and item.get('api_key'):
                     key_name = item.get('key_name')
+                    logger.info(f"BUILD_CONFIG DEBUG - Capability {cap_id} needs key: {key_name}")
                     if key_name and key_name in data:
                         config['capabilities'][cap_id]['api_key'] = encrypt_value(data[key_name])
+                        logger.info(f"BUILD_CONFIG DEBUG - Added {key_name} for {cap_id}")
+                    elif key_name:
+                        logger.info(f"BUILD_CONFIG DEBUG - {key_name} NOT found in data")
     
     return config
 
