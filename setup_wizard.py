@@ -228,10 +228,24 @@ def build_config(data: dict) -> dict:
 
 
 if __name__ == '__main__':
+    import time
+    import threading
+    import webbrowser
+    
+    def open_browser():
+        """Open browser after short delay"""
+        time.sleep(2)
+        webbrowser.open('http://localhost:5000')
+    
     print("🐻 ABC Setup Wizard")
     print("=" * 40)
     print("Open http://localhost:5000 in your browser")
     print("=" * 40)
+    
+    # Start browser in background thread
+    browser_thread = threading.Thread(target=open_browser, daemon=True)
+    browser_thread.start()
+    
     app.run(host='0.0.0.0', port=5000, debug=True)
 
 # For Vercel serverless deployment
