@@ -79,6 +79,26 @@ python agentbear.py info --config my-agent.yaml
 python agentbear.py chat -m "What's the weather like?" --config my-agent.yaml
 ```
 
+### Option D: Telegram Bot 💬
+
+If you enabled Telegram during setup:
+
+1. **Start the bot:**
+```bash
+python agentbear.py telegram --config my-agent.yaml
+```
+
+2. **Find your bot on Telegram:**
+   - Search for your bot's username (you set this during setup)
+   - Or use the bot link: `t.me/YourBotName`
+
+3. **Start chatting:**
+   - Send `/start` to begin
+   - Type any message - your agent will reply!
+   - Use `/help` to see available commands
+
+> 💡 **Tip:** The Telegram bot uses the same memory as other methods, so your conversations are remembered across platforms!
+
 ---
 
 ## 📁 File Structure
