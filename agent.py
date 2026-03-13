@@ -77,6 +77,14 @@ class ABCAIAgent:
             self.file_tools = FileTools(security_config.allowed_base_dir)
             logger.info("📁 File tools initialized")
         
+        # Initialize code tools if capability enabled
+        self.code_tools = None
+        if any(cap in ['code_generate', 'code_review', 'debug', 'documentation'] 
+               for cap in self.config.capabilities.keys()):
+            from code_tools import CodeTools
+            self.code_tools = CodeTools(self._chat_with_llm)
+            logger.info("📝 Code tools initialized")
+        
         # Start Telegram bot if capability enabled
         self.telegram_app = None
         if TELEGRAM_AVAILABLE and 'telegram_bot' in self.config.capabilities:
@@ -266,6 +274,43 @@ Always be helpful, accurate, and responsive.
         
         return None
     
+    def _chat_with_llm(self, prompt: str, session_id: str = None) -> Dict:
+        """
+        Helper method for tools to chat with LLM
+        
+        Args:
+            prompt: The prompt to send
+            session_id: Optional session ID
+            
+        Returns:
+            Dict with response
+        """
+        if not session_id:
+            session_id = f"tool_session_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
+        # Get provider
+        provider = self._get_provider_for_model(self.config.primary_model)
+        if not provider:
+            return {'response': 'Error: No LLM provider available'}
+        
+        # Build messages
+        messages = [
+            {'role': 'system', 'content': self._get_system_prompt()},
+            {'role': 'user', 'content': prompt}
+        ]
+        
+        try:
+            response_text = provider.chat(
+                messages=messages,
+                model=self.config.primary_model,
+                max_tokens=4000,
+                temperature=0.3
+            )
+            return {'response': response_text}
+        except Exception as e:
+            logger.error(f"LLM chat failed: {e}")
+            return {'response': f'Error: {str(e)}'}
+    
     def chat(self, message: str, session_id: str = None, context: Dict = None) -> Dict:
         """
         Process a chat message and return response
@@ -315,6 +360,31 @@ Always be helpful, accurate, and responsive.
                 'session_id': session_id,
                 'tool_result': file_result
             }
+        
+        # Check for code commands (if code tools enabled)
+        if self.code_tools:
+            code_result = self.code_tools.detect_and_execute(message)
+            if code_result:
+                # Format code result as response
+                if code_result.get('success'):
+                    if 'code' in code_result:
+                        response = f"📝 **Generated {code_result.get('language', 'code').title()} Code:**\n\n{code_result['code']}"
+                    elif 'review' in code_result:
+                        response = f"🔍 **Code Review:**\n\n{code_result['review']}"
+                    elif 'analysis' in code_result:
+                        response = f"🐛 **Debug Analysis:**\n\n{code_result['analysis']}"
+                    elif 'documented_code' in code_result:
+                        response = f"📚 **Documented Code:**\n\n{code_result['documented_code']}"
+                    else:
+                        response = f"✅ {code_result}"
+                else:
+                    response = f"❌ Error: {code_result.get('error', 'Unknown error')}"
+                
+                return {
+                    'response': response,
+                    'session_id': session_id,
+                    'tool_result': code_result
+                }
         
         # Get conversation history
         history = []
