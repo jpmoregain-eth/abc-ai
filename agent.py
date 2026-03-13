@@ -77,12 +77,23 @@ class ABCAIAgent:
     def _setup_telegram_bot(self):
         """Initialize and start Telegram bot"""
         try:
-            bot_config = self.config.capabilities.get('telegram_bot', {})
-            token = bot_config.get('api_key', '')
+            from crypto_utils import decrypt_value
             
-            if not token:
+            bot_config = self.config.capabilities.get('telegram_bot', {})
+            encrypted_token = bot_config.get('api_key', '')
+            
+            if not encrypted_token:
                 logger.warning("Telegram bot token not found in config")
                 return
+            
+            # Decrypt the token
+            token = decrypt_value(encrypted_token)
+            
+            if not token or token == encrypted_token:
+                logger.error("Failed to decrypt Telegram bot token")
+                return
+            
+            logger.info(f"Telegram bot token decrypted (length: {len(token)})")
             
             # Build application
             self.telegram_app = Application.builder().token(token).build()
