@@ -97,20 +97,6 @@ communication:
       requires_api_key: true
       key_name: telegram_bot_token
       key_description: Telegram Bot Token (from @BotFather)
-      
-    - id: discord_bot
-      name: Discord Bot
-      description: Interact via Discord messaging
-      requires_api_key: true
-      key_name: discord_bot_token
-      key_description: Discord Bot Token
-      
-    - id: slack_integration
-      name: Slack Integration
-      description: Post messages to Slack channels
-      requires_api_key: true
-      key_name: slack_token
-      key_description: Slack API Token
 
 dev_tools:
   name: Developer Tools
@@ -143,10 +129,3 @@ specialized:
       requires_secret: true
       secret_name: binance_api_secret
       secret_description: Binance API Secret
-      
-    - id: database_query
-      name: Database Query
-      description: Query SQL databases
-      requires_api_key: true
-      key_name: database_connection_string
-      key_description: Database Connection String
