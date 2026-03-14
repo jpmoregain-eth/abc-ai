@@ -101,13 +101,6 @@ dev_tools:
       requires_api_key: true
       key_name: github_token
       key_description: GitHub Personal Access Token
-      
-    - id: gitlab_integration
-      name: GitLab Integration
-      description: GitLab API operations
-      requires_api_key: true
-      key_name: gitlab_token
-      key_description: GitLab Access Token
 
 specialized:
   name: Specialized
